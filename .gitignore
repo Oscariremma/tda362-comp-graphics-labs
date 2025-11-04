@@ -9,3 +9,5 @@ build/
 /.vs
 
 *.blend1
+/.direnv/
+/.idea/

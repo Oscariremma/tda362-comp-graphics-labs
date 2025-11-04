@@ -1,4 +1,4 @@
-cmake_minimum_required ( VERSION 3.0.2 )
+cmake_minimum_required ( VERSION 3.5 )
 
 project ( computer-graphics-labs )
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
