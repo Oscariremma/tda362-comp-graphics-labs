@@ -876,7 +876,7 @@ float randf()
 
 ///////////////////////////////////////////////////////////////////////////
 // Generate uniform points on a disc
-// We use Shirley’s square-to-circle mapping to convert the 2 randf samples to
+// We use ShirleyÂ’s square-to-circle mapping to convert the 2 randf samples to
 // the disk.
 // https://www.pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations#SamplingaUnitDisk
 // This approach is not really necessary in our case, since we use a prng to

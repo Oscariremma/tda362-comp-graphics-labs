@@ -111,6 +111,7 @@ GLuint loadCubeMap(const char* facePosX,
 /// Helper function used to get log info (such as errors) about a shader object or shader program
 ///////////////////////////////////////////////////////////////////////////
 std::string GetShaderInfoLog(GLuint obj);
+std::string GetShaderProgramInfoLog(GLuint obj);
 
 ///////////////////////////////////////////////////////////////////////////
 /// Loads and compiles a fragment and vertex shader. Then creates a shader program
