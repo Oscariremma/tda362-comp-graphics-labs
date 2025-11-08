@@ -43,9 +43,8 @@ GLuint shaderProgram;
 
 // The vertexArrayObject here will hold the pointers to
 // the vertex data (in positionBuffer) and color data per vertex (in colorBuffer)
-GLuint positionBuffer, colorBuffer, indexBuffer, vertexArrayObject;
-
-
+GLuint positionBuffer, colorBuffer, indexBuffer, vertexArrayObject, textureUvBuffer, texture, explosionVertexArrayObject
+       , explosionVertexBuffer, explosionUvBuffer, explosionTexture;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -68,10 +67,10 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	const float positions[] = {
 		// X      Y       Z
-		-10.0f, 0.0f, -10.0f,  // v0
+		-10.0f, 0.0f, -10.0f, // v0
 		-10.0f, 0.0f, -330.0f, // v1
-		10.0f,  0.0f, -330.0f, // v2
-		10.0f,  0.0f, -10.0f   // v3
+		10.0f, 0.0f, -330.0f, // v2
+		10.0f, 0.0f, -10.0f // v3
 	};
 	// Create a handle for the vertex position buffer
 	glGenBuffers(1, &positionBuffer);
@@ -91,12 +90,27 @@ void initialize()
 	//			Enable the vertex attrib array.
 	///////////////////////////////////////////////////////////////////////////
 
+	float texcoords[] = {
+		0.0f, 0.0f, // (u,v) for v0
+		0.0f, 15.0f, // (u,v) for v1
+		1.0f, 15.0f, // (u,v) for v2
+		1.0f, 0.0f // (u,v) for v3
+	};
+
+	glGenBuffers(1, &textureUvBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, textureUvBuffer);
+	glBufferData(GL_ARRAY_BUFFER, labhelper::array_length(texcoords) * sizeof(float), texcoords, GL_STATIC_DRAW);
+
+
+	glVertexAttribPointer(1, 2, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(1);
+
 	///////////////////////////////////////////////////////////////////////////
 	// Create the element array buffer object
 	///////////////////////////////////////////////////////////////////////////
 	const int indices[] = {
-		0, 1, 3, // Triangle 1
-		1, 2, 3  // Triangle 2
+		3, 1, 0, // Triangle 1
+		3, 2, 1 // Triangle 2
 	};
 	glGenBuffers(1, &indexBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -115,6 +129,88 @@ void initialize()
 	//			Load Texture
 	//************************************
 	// Task 2
+
+	int w, h, comp;
+	unsigned char* image = stbi_load("../scenes/textures/asphalt.jpg", &w, &h, &comp, STBI_rgb_alpha);
+
+	if (image == nullptr)
+	{
+		labhelper::fatal_error("Failed to load texture");
+	}
+
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+	free(image);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0f);
+
+
+	// Explosion setup
+	//////////////////////////////////////
+	glGenVertexArrays(1, &explosionVertexArrayObject);
+	glBindVertexArray(explosionVertexArrayObject);
+
+	float exposionQuadsVertices[] = {
+		0.0f, 0.0f, -80.0f, // v0
+		0.0f, 20.0f, -80.0f, // v1
+		20.0f, 20.0f, -80.0f, // v2
+		20.0f, 0.0f, -80.0f // v3
+	};
+
+	glGenBuffers(1, &explosionVertexBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, explosionVertexBuffer);
+	glBufferData(GL_ARRAY_BUFFER, labhelper::array_length(exposionQuadsVertices) * sizeof(float), exposionQuadsVertices,
+	             GL_STATIC_DRAW);
+	glVertexAttribPointer(0, 3, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(0);
+
+
+	// Reuse index buffer
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+
+	float explosionTexcoords[] = {
+		0.0f, 0.0f,
+		0.0f, 1.0f,
+		1.0f, 1.0f,
+		1.0f, 0.0f
+	};
+
+	glGenBuffers(1, &explosionUvBuffer);
+	glBindBuffer(GL_ARRAY_BUFFER, explosionUvBuffer);
+	glBufferData(GL_ARRAY_BUFFER, labhelper::array_length(explosionTexcoords) * sizeof(float), explosionTexcoords,
+	             GL_STATIC_DRAW);
+	glVertexAttribPointer(1, 2, GL_FLOAT, false/*normalized*/, 0/*stride*/, 0/*offset*/);
+	glEnableVertexAttribArray(1);
+
+	image = stbi_load("../scenes/textures/explosion.png", &w, &h, &comp, STBI_rgb_alpha);
+
+	if (image == nullptr)
+	{
+		labhelper::fatal_error("Failed to load texture");
+	}
+
+	glGenTextures(1, &explosionTexture);
+	glBindTexture(GL_TEXTURE_2D, explosionTexture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
+	free(image);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	glGenerateMipmap(GL_TEXTURE_2D);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0f);
 }
 
 
@@ -137,7 +233,7 @@ void display(void)
 
 	// We disable backface culling for this tutorial, otherwise care must be taken with the winding order
 	// of the vertices. It is however a lot faster to enable culling when drawing large scenes.
-	glDisable(GL_CULL_FACE); //glEnable(GL_CULL_FACE);
+	glEnable(GL_CULL_FACE);
 	// Disable depth testing
 	glDisable(GL_DEPTH_TEST);
 	// Set the shader program to use for this draw call
@@ -158,8 +254,22 @@ void display(void)
 
 	// Task 3.1
 
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture);
+
 	glBindVertexArray(vertexArrayObject);
 	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+
+	glActiveTexture(GL_TEXTURE0);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBindTexture(GL_TEXTURE_2D, explosionTexture);
+	glBindVertexArray(explosionVertexArrayObject);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+	glDisable(GL_BLEND);
+
+	glBindTexture(GL_TEXTURE_2D, texture);
 
 
 	glUseProgram(0); // "unsets" the current shader program. Not really necessary.
@@ -189,12 +299,48 @@ void gui()
 	ImGui::PopID();
 
 	ImGui::SliderFloat("Anisotropic filtering", &anisotropy, 1.0, 16.0, "Number of samples: %.0f");
-	ImGui::Dummy({ 0, 20 });
+	ImGui::Dummy({0, 20});
 	ImGui::SliderFloat("Camera Panning", &camera_pan, -1.0, 1.0);
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
 	            ImGui::GetIO().Framerate);
 	// ----------------------------------------------------------
 
+	switch (mag)
+	{
+	case 0:
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		break;
+	case 1:
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		break;
+	default:
+		break;
+	}
+	switch (mini)
+	{
+	case 0:
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		break;
+	case 1:
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		break;
+	case 2:
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+		break;
+	case 3:
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+		break;
+	case 4:
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+		break;
+	case 5:
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		break;
+	default:
+		break;
+	}
+
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, anisotropy);
 }
 
 int main(int argc, char* argv[])
@@ -205,27 +351,27 @@ int main(int argc, char* argv[])
 
 	// render-loop
 	bool stopRendering = false;
-	while(!stopRendering)
+	while (!stopRendering)
 	{
 		// Inform imgui of new frame
 		ImGui_ImplSdlGL3_NewFrame(g_window);
 
 		// check events (keyboard among other)
 		SDL_Event event;
-		while(SDL_PollEvent(&event))
+		while (SDL_PollEvent(&event))
 		{
 			// Allow ImGui to capture events.
 			ImGui_ImplSdlGL3_ProcessEvent(&event);
 
-			if(event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
+			if (event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
 			{
 				stopRendering = true;
 			}
-			else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
+			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
 			{
 				showUI = !showUI;
 			}
-			else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
+			else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
 			{
 				labhelper::saveScreenshot();
 			}
@@ -235,7 +381,7 @@ int main(int argc, char* argv[])
 		display();
 
 		// Render overlay GUI.
-		if(showUI)
+		if (showUI)
 		{
 			gui();
 		}
