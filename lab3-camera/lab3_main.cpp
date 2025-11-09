@@ -27,7 +27,7 @@ using std::max;
 SDL_Window* g_window = nullptr;
 
 // Mouse input
-ivec2 g_prevMouseCoords = { -1, -1 };
+ivec2 g_prevMouseCoords = {-1, -1};
 bool g_isMouseDragging = false;
 
 float currentTime = 0.0f;
@@ -50,6 +50,7 @@ Model* cityModel = nullptr;
 Model* carModel = nullptr;
 Model* groundModel = nullptr;
 mat4 carModelMatrix(1.0f);
+mat4 animatedCarModelMatrix(1.0f);
 
 vec3 worldUp = vec3(0.0f, 1.0f, 0.0f);
 
@@ -66,7 +67,8 @@ struct PerspectiveParams
 	float near;
 	float far;
 };
-PerspectiveParams pp = { 45.0f, 1280, 720, 0.1f, 300.0f };
+
+PerspectiveParams pp = {45.0f, 1280, 720, 0.1f, 300.0f};
 int old_w = 1280;
 int old_h = 720;
 
@@ -108,6 +110,18 @@ void drawGround(mat4 mvpMatrix)
 }
 
 
+void animateCar()
+{
+	const vec3 roundaboutCenter = vec3(20.0f, 0.0f, 0.0f);
+	const float radius = 9.2f;
+	const float speed = 0.25f; // revolutions per second
+	float angle = currentTime * speed * 2.0f * float(M_PI);
+
+	mat4 translation = translate(roundaboutCenter + vec3(radius * cos(angle), 0.0f, radius * sin(angle)));
+	mat4 rotation = rotate(-angle, vec3(0.0f, 1.0f, 0.0f));
+	carModelMatrix = translation * rotation;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 /// This function will be called once per frame, so the code to set up
 /// the scene for rendering should go here
@@ -118,7 +132,7 @@ void display()
 	int w, h;
 	SDL_GetWindowSize(g_window, &w, &h);
 
-	if(pp.w != old_w || pp.h != old_h)
+	if (pp.w != old_w || pp.h != old_h)
 	{
 		SDL_SetWindowSize(g_window, pp.w, pp.h);
 		w = pp.w;
@@ -127,11 +141,11 @@ void display()
 		old_h = pp.h;
 	}
 
-	glViewport(0, 0, w, h);                             // Set viewport
-	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);               // Set clear color
+	glViewport(0, 0, w, h); // Set viewport
+	glClearColor(0.2f, 0.2f, 0.8f, 1.0f); // Set clear color
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clears the color buffer and the z-buffer
-	glEnable(GL_DEPTH_TEST);                            // enable Z-buffering
-	glDisable(GL_CULL_FACE);                            // disables not showing back faces of triangles
+	glEnable(GL_DEPTH_TEST); // enable Z-buffering
+	glEnable(GL_CULL_FACE); // disables not showing back faces of triangles
 
 	// Set the shader program to use for this draw call
 	glUseProgram(shaderProgram);
@@ -139,17 +153,17 @@ void display()
 	// Set up model matrices
 	mat4 cityModelMatrix(1.0f);
 
-	// Set up the view matrix
-	// The view matrix defines where the viewer is looking
-	// Initially fixed, but will be replaced in the tutorial.
-	mat4 constantViewMatrix = mat4(0.707106769f, -0.408248276f, 1.00000000f, 0.000000000f,  //
-	                               0.000000000f, 0.816496551f, 1.00000000f, 0.000000000f,   //
-	                               -0.707106769f, -0.408248276f, 1.00000000f, 0.000000000f, //
-	                               0.000000000f, 0.000000000f, -30.0000000f, 1.00000000f);  //
-	mat4 viewMatrix = constantViewMatrix;
+
+	vec3 cameraRight = normalize(cross(cameraDirection, worldUp));
+	vec3 cameraUp = normalize(cross(cameraRight, cameraDirection));
+
+	mat3 cameraBaseVectorsWorldSpace(cameraRight, cameraUp, -cameraDirection);
+
+	mat4 cameraRotation = mat4(transpose(cameraBaseVectorsWorldSpace));
+	mat4 viewMatrix = cameraRotation * translate(-cameraPosition);
 
 	// Setup the projection matrix
-	if(w != old_w || h != old_h)
+	if (w != old_w || h != old_h)
 	{
 		pp.h = h;
 		pp.w = w;
@@ -172,9 +186,16 @@ void display()
 
 	// Ground
 	// Task 5: Uncomment this
-	//drawGround(modelViewProjectionMatrix);
+	drawGround(modelViewProjectionMatrix);
 
 	// car
+	modelViewProjectionMatrix = projectionMatrix * viewMatrix * carModelMatrix;
+	glUniformMatrix4fv(mvploc, 1, false, &modelViewProjectionMatrix[0].x);
+	glUniformMatrix4fv(mloc, 1, false, &carModelMatrix[0].x);
+	render(carModel);
+
+	// Animated car
+	animateCar();
 	modelViewProjectionMatrix = projectionMatrix * viewMatrix * carModelMatrix;
 	glUniformMatrix4fv(mvploc, 1, false, &modelViewProjectionMatrix[0].x);
 	glUniformMatrix4fv(mloc, 1, false, &carModelMatrix[0].x);
@@ -194,26 +215,26 @@ bool handleEvents(void)
 	SDL_Event event;
 	bool quitEvent = false;
 
-	while(SDL_PollEvent(&event))
+	while (SDL_PollEvent(&event))
 	{
 		// Allow ImGui to capture events.
 		ImGui_ImplSdlGL3_ProcessEvent(&event);
 
 		// More info at https://wiki.libsdl.org/SDL_Event
-		if(event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
+		if (event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
 		{
 			quitEvent = true;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
 		{
 			showUI = !showUI;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
 		{
 			labhelper::saveScreenshot();
 		}
-		else if(event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT
-		        && !(ImGui::GetIO().WantCaptureMouse))
+		else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT
+			&& !(ImGui::GetIO().WantCaptureMouse))
 		{
 			g_isMouseDragging = true;
 			int x;
@@ -223,19 +244,22 @@ bool handleEvents(void)
 			g_prevMouseCoords.y = y;
 		}
 
-		if(!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
+		if (!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
 		{
 			g_isMouseDragging = false;
 		}
 
-		if(event.type == SDL_MOUSEMOTION && g_isMouseDragging && !(ImGui::GetIO().WantCaptureMouse))
+		if (event.type == SDL_MOUSEMOTION && g_isMouseDragging && !(ImGui::GetIO().WantCaptureMouse))
 		{
 			// More info at https://wiki.libsdl.org/SDL_MouseMotionEvent
 			int delta_x = event.motion.x - g_prevMouseCoords.x;
 			int delta_y = event.motion.y - g_prevMouseCoords.y;
-			if(event.button.button == SDL_BUTTON_LEFT)
+			if (event.button.button & SDL_BUTTON(SDL_BUTTON_LEFT))
 			{
-				printf("Mouse motion while left button down (%i, %i)\n", event.motion.x, event.motion.y);
+				float rotationSpeed = 0.005f;
+				mat4 yaw = rotate(rotationSpeed * -delta_x, worldUp);
+				mat4 pitch = rotate(rotationSpeed * -delta_y, normalize(cross(cameraDirection, worldUp)));
+				cameraDirection = vec3(pitch * yaw * vec4(cameraDirection, 0.0f));
 			}
 			g_prevMouseCoords.x = event.motion.x;
 			g_prevMouseCoords.y = event.motion.y;
@@ -245,22 +269,59 @@ bool handleEvents(void)
 	// check keyboard state (which keys are still pressed)
 	const uint8_t* state = SDL_GetKeyboardState(nullptr);
 
+	const float carSpeed = 10.0f;
+	const float carTurnSpeed = 1.0f;
 	// implement camera controls based on key states
-	if(state[SDL_SCANCODE_UP])
+
+	if (state[SDL_SCANCODE_UP])
 	{
-		printf("Key Up is pressed down\n");
+		T = translate(carSpeed * deltaTime * normalize(vec3(R[2]))) * T;
 	}
-	if(state[SDL_SCANCODE_DOWN])
+	if (state[SDL_SCANCODE_DOWN])
 	{
-		printf("Key Down is pressed down\n");
+		T = translate(-carSpeed * deltaTime * normalize(vec3(R[2]))) * T;
 	}
-	if(state[SDL_SCANCODE_LEFT])
+
+	if (state[SDL_SCANCODE_LEFT])
 	{
-		printf("Key Left is pressed down\n");
+		R = rotate(radians(carTurnSpeed * deltaTime * 60.0f), worldUp) * R;
 	}
-	if(state[SDL_SCANCODE_RIGHT])
+	if (state[SDL_SCANCODE_RIGHT])
 	{
-		printf("Key Right is pressed down\n");
+		R = rotate(radians(-carTurnSpeed * deltaTime * 60.0f), worldUp) * R;
+	}
+
+	carModelMatrix = T * R;
+
+
+	const float cameraSpeed = state[SDL_SCANCODE_LSHIFT] ? 20.0f : 10.0f;
+
+
+	if (state[SDL_SCANCODE_W])
+	{
+		cameraPosition = vec3(cameraDirection * cameraSpeed * deltaTime) + cameraPosition;
+	}
+	if (state[SDL_SCANCODE_S])
+	{
+		cameraPosition = vec3(-cameraDirection * cameraSpeed * deltaTime) + cameraPosition;
+	}
+	if (state[SDL_SCANCODE_A])
+	{
+		cameraPosition =
+			vec3(-normalize(cross(cameraDirection, worldUp)) * cameraSpeed * deltaTime) + cameraPosition;
+	}
+	if (state[SDL_SCANCODE_D])
+	{
+		cameraPosition =
+			vec3(normalize(cross(cameraDirection, worldUp)) * cameraSpeed * deltaTime) + cameraPosition;
+	}
+	if (state[SDL_SCANCODE_SPACE])
+	{
+		cameraPosition = vec3(worldUp * cameraSpeed * deltaTime) + cameraPosition;
+	}
+	if (state[SDL_SCANCODE_LCTRL])
+	{
+		cameraPosition = vec3(-worldUp * cameraSpeed * deltaTime) + cameraPosition;
 	}
 
 	return quitEvent;
@@ -279,7 +340,7 @@ void gui()
 	ImGui::Text("Aspect Ratio: %.2f", float(pp.w) / float(pp.h));
 	ImGui::SliderFloat("Near Plane", &pp.near, 0.1f, 300.0f, "%.2f", 2.f);
 	ImGui::SliderFloat("Far Plane", &pp.far, 0.1f, 300.0f, "%.2f", 2.f);
-	if(ImGui::Button("Reset"))
+	if (ImGui::Button("Reset"))
 	{
 		pp.fov = 45.0f;
 		pp.w = 1280;
@@ -303,7 +364,7 @@ int main(int argc, char* argv[])
 	bool stopRendering = false;
 	auto startTime = std::chrono::system_clock::now();
 
-	while(!stopRendering)
+	while (!stopRendering)
 	{
 		// update currentTime
 		std::chrono::duration<float> timeSinceStart = std::chrono::system_clock::now() - startTime;
@@ -319,7 +380,7 @@ int main(int argc, char* argv[])
 		display();
 
 		// Render overlay GUI.
-		if(showUI)
+		if (showUI)
 		{
 			gui();
 		}
