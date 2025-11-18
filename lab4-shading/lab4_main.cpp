@@ -25,7 +25,7 @@ static int windowWidth, windowHeight;
 bool showUI = true;
 
 // Mouse input
-ivec2 g_prevMouseCoords = { -1, -1 };
+ivec2 g_prevMouseCoords = {-1, -1};
 bool g_isMouseDragging = false;
 bool g_isMouseRightDragging = false;
 
@@ -88,15 +88,15 @@ void changeScene(std::string sceneName)
 	selectedModelIdxInScene = 0;
 	selectedMeshInModel = 0;
 	selectedMaterialIdx =
-	    scenes[currentScene].models[selectedModelIdxInScene]->m_meshes[selectedMeshInModel].m_material_idx;
+		scenes[currentScene].models[selectedModelIdxInScene]->m_meshes[selectedMeshInModel].m_material_idx;
 	camera = scenes[currentScene].camera;
 }
 
 void cleanupScenes()
 {
-	for(auto& it : scenes)
+	for (auto& it : scenes)
 	{
-		for(auto m : it.second.models)
+		for (auto m : it.second.models)
 		{
 			labhelper::freeModel(m);
 		}
@@ -105,33 +105,39 @@ void cleanupScenes()
 
 void loadScenes()
 {
-	scenes["Ship"] = { {
-		                   // Models
-		                   labhelper::loadModelFromOBJ("../scenes/space-ship.obj"),
-		               },
-		               {
-		                   // Camera
-		                   vec3(-30, 10, 30),
-		                   normalize(-vec3(-30, 5, 30)),
-		               } };
-	scenes["Material Test"] = { {
-		                            // Models
-		                            labhelper::loadModelFromOBJ("../scenes/materialtest.obj"),
-		                        },
-		                        {
-		                            // Camera
-		                            vec3(0, 30, 30),
-		                            normalize(-vec3(0, 30, 30)),
-		                        } };
-	scenes["Cube"] = { {
-		                   // Models
-		                   labhelper::loadModelFromOBJ("../scenes/cube.obj"),
-		               },
-		               {
-		                   // Camera
-		                   vec3(2, 2, 2),
-		                   normalize(-vec3(2, 2, 2)),
-		               } };
+	scenes["Ship"] = {
+		{
+			// Models
+			labhelper::loadModelFromOBJ("../scenes/space-ship.obj"),
+		},
+		{
+			// Camera
+			vec3(-30, 10, 30),
+			normalize(-vec3(-30, 5, 30)),
+		}
+	};
+	scenes["Material Test"] = {
+		{
+			// Models
+			labhelper::loadModelFromOBJ("../scenes/materialtest.obj"),
+		},
+		{
+			// Camera
+			vec3(0, 30, 30),
+			normalize(-vec3(0, 30, 30)),
+		}
+	};
+	scenes["Cube"] = {
+		{
+			// Models
+			labhelper::loadModelFromOBJ("../scenes/cube.obj"),
+		},
+		{
+			// Camera
+			vec3(2, 2, 2),
+			normalize(-vec3(2, 2, 2)),
+		}
+	};
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -142,17 +148,17 @@ void loadShaders(bool is_reload)
 {
 	GLuint shader = labhelper::loadShaderProgram("../lab4-shading/shading.vert",
 	                                             "../lab4-shading/shading.frag", is_reload);
-	if(shader != 0)
+	if (shader != 0)
 		shaderProgram = shader;
 
 	shader = labhelper::loadShaderProgram("../lab4-shading/background.vert",
 	                                      "../lab4-shading/background.frag", is_reload);
-	if(shader != 0)
+	if (shader != 0)
 		backgroundProgram = shader;
 
 	shader = labhelper::loadShaderProgram("../lab4-shading/simple.vert", "../lab4-shading/simple.frag",
 	                                      is_reload);
-	if(shader != 0)
+	if (shader != 0)
 		simpleShaderProgram = shader;
 }
 
@@ -164,10 +170,24 @@ void initFullScreenQuad()
 	///////////////////////////////////////////////////////////////////////////
 	// initialize the fullScreenQuadVAO for drawFullScreenQuad
 	///////////////////////////////////////////////////////////////////////////
-	if(fullScreenQuadVAO == 0)
+	if (fullScreenQuadVAO == 0)
 	{
 		// Task 4.1
-		// ...
+		static const vec2 positions[] = {
+			{-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f},
+			{-1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f}
+		};
+		GLuint positionBuffer;
+		glGenBuffers(1, &positionBuffer);
+		glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
+		glBufferData(GL_ARRAY_BUFFER, labhelper::array_length(positions) * sizeof(glm::vec2), positions,
+		             GL_STATIC_DRAW);
+
+		glGenVertexArrays(1, &fullScreenQuadVAO);
+		glBindVertexArray(fullScreenQuadVAO);
+		glBindBuffer(GL_ARRAY_BUFFER, positionBuffer);
+		glVertexAttribPointer(0, 2, GL_FLOAT, false, 0, 0);
+		glEnableVertexAttribArray(0);
 	}
 }
 
@@ -180,7 +200,15 @@ void drawFullScreenQuad()
 	// draw a quad at full screen
 	///////////////////////////////////////////////////////////////////////////
 	// Task 4.2
-	// ...
+	bool previousDepthState;
+	glGetBooleanv(GL_DEPTH_TEST, (GLboolean*)&previousDepthState);
+	glDisable(GL_DEPTH_TEST);
+	glBindVertexArray(fullScreenQuadVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	if (previousDepthState)
+		glEnable(GL_DEPTH_TEST);
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 
@@ -208,7 +236,7 @@ void initialize()
 		{
 			stbi_set_flip_vertically_on_load(true);
 			data = stbi_loadf(filename.c_str(), &width, &height, &components, 3);
-			if(data == NULL)
+			if (data == NULL)
 			{
 				std::cout << "Failed to load image: " << filename << ".\n";
 				exit(1);
@@ -226,7 +254,8 @@ void initialize()
 	// NOTE: You can safely ignore this until you start Task 4.
 	///////////////////////////////////////////////////////////////////////////
 	initFullScreenQuad();
-	{ // Environment map
+	{
+		// Environment map
 		HDRImage image("../scenes/envmaps/" + envmap_base_name + ".hdr");
 		glGenTextures(1, &environmentMap);
 		glBindTexture(GL_TEXTURE_2D, environmentMap);
@@ -236,7 +265,8 @@ void initialize()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	}
-	{ // Irradiance map
+	{
+		// Irradiance map
 		HDRImage image("../scenes/envmaps/" + envmap_base_name + "_irradiance.hdr");
 		glGenTextures(1, &irradianceMap);
 		glBindTexture(GL_TEXTURE_2D, irradianceMap);
@@ -246,7 +276,8 @@ void initialize()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	}
-	{ // Reflection map
+	{
+		// Reflection map
 		glGenTextures(1, &reflectionMap);
 		glBindTexture(GL_TEXTURE_2D, reflectionMap);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -263,7 +294,7 @@ void initialize()
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, image.width, image.height, 0, GL_RGB, GL_FLOAT, image.data);
 
 		const int roughnesses = 8;
-		for(int i = 1; i < roughnesses; i++)
+		for (int i = 1; i < roughnesses; i++)
 		{
 			HDRImage image("../scenes/envmaps/" + envmap_base_name + "_dl_" + std::to_string(i) + ".hdr");
 			glTexImage2D(GL_TEXTURE_2D, i, GL_RGB32F, image.width, image.height, 0, GL_RGB, GL_FLOAT,
@@ -339,6 +370,11 @@ void display(void)
 	// Task 4.3 - Render a fullscreen quad, to generate the background from the
 	//            environment map.
 	///////////////////////////////////////////////////////////////////////////
+	glUseProgram(backgroundProgram);
+	labhelper::setUniformSlow(backgroundProgram, "environment_multiplier", environment_multiplier);
+	labhelper::setUniformSlow(backgroundProgram, "inv_PV", inverse(projectionMatrix * viewMatrix));
+	labhelper::setUniformSlow(backgroundProgram, "camera_pos", camera.position);
+	drawFullScreenQuad();
 
 	///////////////////////////////////////////////////////////////////////////
 	// Render the .obj models
@@ -347,7 +383,7 @@ void display(void)
 	// Light source
 	vec4 lightStartPosition = vec4(0.0f, 20.0f, 20.0f, 1.0f);
 	float light_rotation_speed = 1.f;
-	if(!lightManualOnly && !g_isMouseRightDragging)
+	if (!lightManualOnly && !g_isMouseRightDragging)
 	{
 		lightRotation += deltaTime * light_rotation_speed;
 	}
@@ -370,7 +406,7 @@ void display(void)
 	labhelper::setUniformSlow(shaderProgram, "normalMatrix", inverse(transpose(viewMatrix * modelMatrix)));
 
 	// Render the scene objects
-	for(labhelper::Model* m : scenes[currentScene].models)
+	for (labhelper::Model* m : scenes[currentScene].models)
 	{
 		labhelper::render(m);
 	}
@@ -393,31 +429,31 @@ bool handleEvents()
 	// Allow ImGui to capture events.
 	ImGuiIO& io = ImGui::GetIO();
 
-	while(SDL_PollEvent(&event))
+	while (SDL_PollEvent(&event))
 	{
 		ImGui_ImplSdlGL3_ProcessEvent(&event);
 
-		if(event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
+		if (event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
 		{
 			quitEvent = true;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
 		{
 			showUI = !showUI;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
 		{
 			labhelper::saveScreenshot();
 		}
-		else if(event.type == SDL_MOUSEBUTTONDOWN && (!showUI || !ImGui::GetIO().WantCaptureMouse)
-		        && (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT)
-		        && !(g_isMouseDragging || g_isMouseRightDragging))
+		else if (event.type == SDL_MOUSEBUTTONDOWN && (!showUI || !ImGui::GetIO().WantCaptureMouse)
+			&& (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT)
+			&& !(g_isMouseDragging || g_isMouseRightDragging))
 		{
-			if(event.button.button == SDL_BUTTON_LEFT)
+			if (event.button.button == SDL_BUTTON_LEFT)
 			{
 				g_isMouseDragging = true;
 			}
-			else if(event.button.button == SDL_BUTTON_RIGHT)
+			else if (event.button.button == SDL_BUTTON_RIGHT)
 			{
 				g_isMouseRightDragging = true;
 			}
@@ -428,28 +464,28 @@ bool handleEvents()
 			g_prevMouseCoords.y = y;
 		}
 
-		if(!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
+		if (!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
 		{
 			g_isMouseDragging = false;
 		}
-		if(!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)))
+		if (!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)))
 		{
 			g_isMouseRightDragging = false;
 		}
 
-		if(event.type == SDL_MOUSEMOTION)
+		if (event.type == SDL_MOUSEMOTION)
 		{
 			// More info at https://wiki.libsdl.org/SDL_MouseMotionEvent
 			int delta_x = event.motion.x - g_prevMouseCoords.x;
 			int delta_y = event.motion.y - g_prevMouseCoords.y;
-			if(g_isMouseDragging)
+			if (g_isMouseDragging)
 			{
 				float rotation_speed = 0.005f;
 				mat4 yaw = rotate(rotation_speed * -delta_x, worldUp);
 				mat4 pitch = rotate(rotation_speed * -delta_y, normalize(cross(camera.direction, worldUp)));
 				camera.direction = vec3(pitch * yaw * vec4(camera.direction, 0.0f));
 			}
-			else if(g_isMouseRightDragging)
+			else if (g_isMouseRightDragging)
 			{
 				const float rotation_speed = 0.01f;
 				lightRotation += delta_x * rotation_speed;
@@ -459,33 +495,33 @@ bool handleEvents()
 		}
 	}
 
-	if(!io.WantCaptureKeyboard)
+	if (!io.WantCaptureKeyboard)
 	{
 		// check keyboard state (which keys are still pressed)
 		const uint8_t* state = SDL_GetKeyboardState(nullptr);
 		vec3 cameraRight = cross(camera.direction, worldUp);
 		const float speed = 10.f;
-		if(state[SDL_SCANCODE_W])
+		if (state[SDL_SCANCODE_W])
 		{
 			camera.position += deltaTime * speed * camera.direction;
 		}
-		if(state[SDL_SCANCODE_S])
+		if (state[SDL_SCANCODE_S])
 		{
 			camera.position -= deltaTime * speed * camera.direction;
 		}
-		if(state[SDL_SCANCODE_A])
+		if (state[SDL_SCANCODE_A])
 		{
 			camera.position -= deltaTime * speed * cameraRight;
 		}
-		if(state[SDL_SCANCODE_D])
+		if (state[SDL_SCANCODE_D])
 		{
 			camera.position += deltaTime * speed * cameraRight;
 		}
-		if(state[SDL_SCANCODE_Q])
+		if (state[SDL_SCANCODE_Q])
 		{
 			camera.position -= deltaTime * speed * worldUp;
 		}
-		if(state[SDL_SCANCODE_E])
+		if (state[SDL_SCANCODE_E])
 		{
 			camera.position += deltaTime * speed * worldUp;
 		}
@@ -500,13 +536,13 @@ bool handleEvents()
 ///////////////////////////////////////////////////////////////////////////////
 void gui()
 {
-	if(ImGui::BeginMainMenuBar())
+	if (ImGui::BeginMainMenuBar())
 	{
-		if(ImGui::BeginMenu("Scene"))
+		if (ImGui::BeginMenu("Scene"))
 		{
-			for(auto it : scenes)
+			for (auto it : scenes)
 			{
-				if(ImGui::MenuItem(it.first.c_str(), nullptr, it.first == currentScene))
+				if (ImGui::MenuItem(it.first.c_str(), nullptr, it.first == currentScene))
 				{
 					changeScene(it.first);
 				}
@@ -522,7 +558,7 @@ void gui()
 	static auto mesh_getter = [](void* vec, int idx, const char** text)
 	{
 		auto& vector = *static_cast<std::vector<labhelper::Mesh>*>(vec);
-		if(idx < 0 || idx >= static_cast<int>(vector.size()))
+		if (idx < 0 || idx >= static_cast<int>(vector.size()))
 		{
 			return false;
 		}
@@ -537,10 +573,10 @@ void gui()
 
 	ImGui::Begin("Control Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 	{
-		if(ImGui::CollapsingHeader("Meshes", "meshes_ch", true, true))
+		if (ImGui::CollapsingHeader("Meshes", "meshes_ch", true, true))
 		{
-			if(ImGui::ListBox("Meshes", &selectedMeshInModel, mesh_getter, (void*)&selected_model->m_meshes,
-			                  int(selected_model->m_meshes.size()), 6))
+			if (ImGui::ListBox("Meshes", &selectedMeshInModel, mesh_getter, (void*)&selected_model->m_meshes,
+			                   int(selected_model->m_meshes.size()), 6))
 			{
 				selectedMaterialIdx = selected_model->m_meshes[selectedMeshInModel].m_material_idx;
 			}
@@ -552,7 +588,7 @@ void gui()
 		///////////////////////////////////////////////////////////////////////////
 		// Show properties for the selected material
 		///////////////////////////////////////////////////////////////////////////
-		if(ImGui::CollapsingHeader("Material", "materials_ch", true, true))
+		if (ImGui::CollapsingHeader("Material", "materials_ch", true, true))
 		{
 			labhelper::Material& material = selected_model->m_materials[selectedMaterialIdx];
 			ImGui::LabelText("Material Name", "%s", material.m_name.c_str());
@@ -566,7 +602,7 @@ void gui()
 		///////////////////////////////////////////////////////////////////////////
 		// Light and environment map
 		///////////////////////////////////////////////////////////////////////////
-		if(ImGui::CollapsingHeader("Light sources", "lights_ch", true, true))
+		if (ImGui::CollapsingHeader("Light sources", "lights_ch", true, true))
 		{
 			ImGui::SliderFloat("Environment multiplier", &environment_multiplier, 0.0f, 10.0f);
 			ImGui::ColorEdit3("Point light color", &point_light_color.x);
@@ -576,18 +612,18 @@ void gui()
 		}
 
 #if ALLOW_SAVE_MATERIALS
-		if(ImGui::Button("Save Materials"))
+		if (ImGui::Button("Save Materials"))
 		{
 			labhelper::saveModelMaterialsToMTL(selected_model,
 			                                   labhelper::file::change_extension(selected_model->m_filename,
-			                                                                     ".mtl"));
+				                                   ".mtl"));
 		}
 #endif
 
 		///////////////////////////////////////////////////////////////////////////
 		// A button for reloading the shaders
 		///////////////////////////////////////////////////////////////////////////
-		if(ImGui::Button("Reload Shaders"))
+		if (ImGui::Button("Reload Shaders"))
 		{
 			loadShaders(true);
 		}
@@ -604,7 +640,7 @@ int main(int argc, char* argv[])
 	bool stopRendering = false;
 	auto startTime = std::chrono::system_clock::now();
 
-	while(!stopRendering)
+	while (!stopRendering)
 	{
 		//update currentTime
 		std::chrono::duration<float> timeSinceStart = std::chrono::system_clock::now() - startTime;
@@ -621,7 +657,7 @@ int main(int argc, char* argv[])
 		display();
 
 		// Then render overlay GUI.
-		if(showUI)
+		if (showUI)
 		{
 			gui();
 		}
