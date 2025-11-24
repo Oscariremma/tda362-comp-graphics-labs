@@ -32,13 +32,13 @@ static float deltaTime = 0.0f;
 bool showUI = false;
 
 // Mouse input
-ivec2 g_prevMouseCoords = { -1, -1 };
+ivec2 g_prevMouseCoords = {-1, -1};
 bool g_isMouseDragging = false;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Shader programs
 ///////////////////////////////////////////////////////////////////////////////
-GLuint backgroundProgram, shaderProgram, postFxShader;
+GLuint backgroundProgram, shaderProgram, postFxShader, verticalBlurShader, horizontalBlurShader, cutoffShader;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Environment
@@ -89,11 +89,14 @@ enum PostProcessingEffect
 	Mosaic = 6,
 	Separable_blur = 7,
 	Bloom = 8,
+	HueShift = 9,
 };
 
 int currentEffect = PostProcessingEffect::None;
 int filterSize = 1;
-int filterSizes[12] = { 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25 };
+int filterSizes[12] = {3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25};
+
+float hueShift = 0.0f;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -140,7 +143,12 @@ struct FboInfo
 		// Generate and bind framebuffer
 		///////////////////////////////////////////////////////////////////////
 		// Task 1
-		//...
+
+		glGenFramebuffers(1, &framebufferId);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTextureTarget, 0);
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthBuffer, 0);
 
 		// check if framebuffer is complete
 		isComplete = checkFramebufferComplete();
@@ -151,12 +159,14 @@ struct FboInfo
 
 	// if no resolution provided
 	FboInfo()
-	    : isComplete(false)
-	    , framebufferId(UINT32_MAX)
-	    , colorTextureTarget(UINT32_MAX)
-	    , depthBuffer(UINT32_MAX)
-	    , width(0)
-	    , height(0){};
+		: isComplete(false)
+		  , framebufferId(UINT32_MAX)
+		  , colorTextureTarget(UINT32_MAX)
+		  , depthBuffer(UINT32_MAX)
+		  , width(0)
+		  , height(0)
+	{
+	};
 
 	void resize(int w, int h)
 	{
@@ -179,7 +189,7 @@ struct FboInfo
 		// invalid drawbuffer, among things.
 		glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
 		GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-		if(status != GL_FRAMEBUFFER_COMPLETE)
+		if (status != GL_FRAMEBUFFER_COMPLETE)
 		{
 			labhelper::fatal_error("Framebuffer not complete");
 		}
@@ -214,13 +224,18 @@ void initialize()
 	                                             "../lab5-rendertotexture/shading.frag");
 	postFxShader = labhelper::loadShaderProgram("../lab5-rendertotexture/postFx.vert",
 	                                            "../lab5-rendertotexture/postFx.frag");
-
+	horizontalBlurShader = labhelper::loadShaderProgram("../lab5-rendertotexture/postFx.vert",
+	                                                    "../lab5-rendertotexture/horizontal_blur.frag");
+	verticalBlurShader = labhelper::loadShaderProgram("../lab5-rendertotexture/postFx.vert",
+	                                                  "../lab5-rendertotexture/vertical_blur.frag");
+	cutoffShader = labhelper::loadShaderProgram("../lab5-rendertotexture/postFx.vert",
+	                                            "../lab5-rendertotexture/cutoff.frag");
 	///////////////////////////////////////////////////////////////////////////
 	// Load environment map
 	///////////////////////////////////////////////////////////////////////////
 	const int roughnesses = 8;
 	std::vector<std::string> filenames;
-	for(int i = 0; i < roughnesses; i++)
+	for (int i = 0; i < roughnesses; i++)
 		filenames.push_back("../scenes/envmaps/" + envmap_base_name + "_dl_" + std::to_string(i) + ".hdr");
 
 	reflectionMap = labhelper::loadHdrMipmapTexture(filenames);
@@ -240,6 +255,11 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////////
 	int w, h;
 	SDL_GetWindowSize(g_window, &w, &h);
+	const int numFbos = 5;
+	for (int i = 0; i < numFbos; i++)
+	{
+		fboList.push_back(FboInfo(w, h));
+	}
 }
 
 
@@ -315,9 +335,9 @@ void display()
 	int w, h;
 	SDL_GetWindowSize(g_window, &w, &h);
 
-	for(int i = 0; i < fboList.size(); i++)
+	for (int i = 0; i < fboList.size(); i++)
 	{
-		if(fboList[i].width != w || fboList[i].height != h)
+		if (fboList[i].width != w || fboList[i].height != h)
 			fboList[i].resize(w, h);
 	}
 
@@ -344,15 +364,27 @@ void display()
 	// draw scene from security camera
 	///////////////////////////////////////////////////////////////////////////
 	// Task 2
-	// ...
+
+	FboInfo& securityFB = fboList[0];
+	glBindFramebuffer(GL_FRAMEBUFFER, securityFB.framebufferId);
+	glViewport(0, 0, securityFB.width, securityFB.height);
+	glClearColor(0.2, 0.2, 0.8, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	drawScene(securityCamViewMatrix, securityCamProjectionMatrix);
 
 	///////////////////////////////////////////////////////////////////////////
 	// draw scene from camera
 	///////////////////////////////////////////////////////////////////////////
-	glBindFramebuffer(GL_FRAMEBUFFER, 0); // to be replaced with another framebuffer when doing post processing
+	FboInfo& mainFB = fboList[1];
+	glBindFramebuffer(GL_FRAMEBUFFER, mainFB.framebufferId);
+	// to be replaced with another framebuffer when doing post processing
 	glViewport(0, 0, w, h);
 	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	labhelper::Material& screen = landingpadModel->m_materials[8];
+	screen.m_emission_texture.gl_id = securityFB.colorTextureTarget;
 
 	drawScene(viewMatrix, projectionMatrix); // using both shaderProgram and backgroundProgram
 
@@ -367,6 +399,73 @@ void display()
 	// 2. Set postFxShader as active
 	// 3. Bind the framebuffer to texture unit 0
 	// 4. Draw a quad over the entire viewport
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, w, h);
+	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	FboInfo& cutoffFB = fboList[2];
+	FboInfo& horizontalBlurFB = fboList[3];
+	FboInfo& verticalBlurFB = fboList[4];
+
+	if (currentEffect == Bloom)
+	{
+		// cutoff shader
+		glBindFramebuffer(GL_FRAMEBUFFER, cutoffFB.framebufferId);
+		glViewport(0, 0, cutoffFB.width, cutoffFB.height);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(cutoffShader);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, mainFB.colorTextureTarget);
+
+		labhelper::drawFullScreenQuad();
+	}
+	if (currentEffect == Separable_blur || currentEffect == Bloom)
+	{
+		// horizontal blur
+		glBindFramebuffer(GL_FRAMEBUFFER, horizontalBlurFB.framebufferId);
+		glViewport(0, 0, horizontalBlurFB.width, horizontalBlurFB.height);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(horizontalBlurShader);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, (currentEffect == Bloom)
+			                             ? cutoffFB.colorTextureTarget
+			                             : mainFB.colorTextureTarget);
+
+		labhelper::drawFullScreenQuad();
+
+		// vertical blur
+		glBindFramebuffer(GL_FRAMEBUFFER, verticalBlurFB.framebufferId);
+		glViewport(0, 0, verticalBlurFB.width, verticalBlurFB.height);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		glUseProgram(verticalBlurShader);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, horizontalBlurFB.colorTextureTarget);
+
+		labhelper::drawFullScreenQuad();
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, w, h);
+	glClearColor(0.2f, 0.2f, 0.8f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glUseProgram(postFxShader);
+	labhelper::setUniformSlow(postFxShader, "time", currentTime);
+	labhelper::setUniformSlow(postFxShader, "currentEffect", currentEffect);
+	labhelper::setUniformSlow(postFxShader, "filterSize", filterSizes[filterSize - 1]);
+	labhelper::setUniformSlow(postFxShader, "hue_shift", hueShift);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, mainFB.colorTextureTarget);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, verticalBlurFB.colorTextureTarget);
+
+	labhelper::drawFullScreenQuad();
 
 	// Task 4: Set the required uniforms
 
@@ -385,25 +484,25 @@ bool handleEvents(void)
 	SDL_Event event;
 	bool quitEvent = false;
 	ImGuiIO& io = ImGui::GetIO();
-	while(SDL_PollEvent(&event))
+	while (SDL_PollEvent(&event))
 	{
 		ImGui_ImplSdlGL3_ProcessEvent(&event);
 
-		if(event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
+		if (event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
 		{
 			quitEvent = true;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
 		{
 			showUI = !showUI;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
 		{
 			labhelper::saveScreenshot();
 		}
-		else if(event.type == SDL_MOUSEBUTTONDOWN
-		        && (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT)
-		        && (!showUI || !ImGui::GetIO().WantCaptureMouse))
+		else if (event.type == SDL_MOUSEBUTTONDOWN
+			&& (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT)
+			&& (!showUI || !ImGui::GetIO().WantCaptureMouse))
 		{
 			g_isMouseDragging = true;
 			int x;
@@ -414,25 +513,25 @@ bool handleEvents(void)
 		}
 
 		uint32_t mouseState = SDL_GetMouseState(NULL, NULL);
-		if(!(mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && !(mouseState & SDL_BUTTON(SDL_BUTTON_RIGHT)))
+		if (!(mouseState & SDL_BUTTON(SDL_BUTTON_LEFT)) && !(mouseState & SDL_BUTTON(SDL_BUTTON_RIGHT)))
 		{
 			g_isMouseDragging = false;
 		}
 
-		if(event.type == SDL_MOUSEMOTION && g_isMouseDragging)
+		if (event.type == SDL_MOUSEMOTION && g_isMouseDragging)
 		{
 			// More info at https://wiki.libsdl.org/SDL_MouseMotionEvent
 			int delta_x = event.motion.x - g_prevMouseCoords.x;
 			int delta_y = event.motion.y - g_prevMouseCoords.y;
 			float rotationSpeed = 0.1f;
-			if(mouseState & SDL_BUTTON(SDL_BUTTON_LEFT))
+			if (mouseState & SDL_BUTTON(SDL_BUTTON_LEFT))
 			{
 				mat4 yaw = rotate(rotationSpeed * deltaTime * -delta_x, worldUp);
 				mat4 pitch = rotate(rotationSpeed * deltaTime * -delta_y,
 				                    normalize(cross(cameraDirection, worldUp)));
 				cameraDirection = vec3(pitch * yaw * vec4(cameraDirection, 0.0f));
 			}
-			else if(mouseState & SDL_BUTTON(SDL_BUTTON_RIGHT))
+			else if (mouseState & SDL_BUTTON(SDL_BUTTON_RIGHT))
 			{
 				mat4 yaw = rotate(rotationSpeed * deltaTime * -delta_x, worldUp);
 				mat4 pitch = rotate(rotationSpeed * deltaTime * -delta_y,
@@ -444,32 +543,32 @@ bool handleEvents(void)
 		}
 	}
 
-	if(!io.WantCaptureKeyboard)
+	if (!io.WantCaptureKeyboard)
 	{
 		// check keyboard state (which keys are still pressed)
 		const uint8_t* state = SDL_GetKeyboardState(nullptr);
 		vec3 cameraRight = cross(cameraDirection, worldUp);
-		if(state[SDL_SCANCODE_W])
+		if (state[SDL_SCANCODE_W])
 		{
 			cameraPosition += deltaTime * cameraSpeed * cameraDirection;
 		}
-		if(state[SDL_SCANCODE_S])
+		if (state[SDL_SCANCODE_S])
 		{
 			cameraPosition -= deltaTime * cameraSpeed * cameraDirection;
 		}
-		if(state[SDL_SCANCODE_A])
+		if (state[SDL_SCANCODE_A])
 		{
 			cameraPosition -= deltaTime * cameraSpeed * cameraRight;
 		}
-		if(state[SDL_SCANCODE_D])
+		if (state[SDL_SCANCODE_D])
 		{
 			cameraPosition += deltaTime * cameraSpeed * cameraRight;
 		}
-		if(state[SDL_SCANCODE_Q])
+		if (state[SDL_SCANCODE_Q])
 		{
 			cameraPosition -= deltaTime * cameraSpeed * worldUp;
 		}
-		if(state[SDL_SCANCODE_E])
+		if (state[SDL_SCANCODE_E])
 		{
 			cameraPosition += deltaTime * cameraSpeed * worldUp;
 		}
@@ -497,6 +596,9 @@ void gui()
 	ImGui::RadioButton("Mosaic", &currentEffect, PostProcessingEffect::Mosaic);
 	ImGui::RadioButton("Separable Blur", &currentEffect, PostProcessingEffect::Separable_blur);
 	ImGui::RadioButton("Bloom", &currentEffect, PostProcessingEffect::Bloom);
+	ImGui::RadioButton("Hue Shift", &currentEffect, PostProcessingEffect::HueShift);
+	ImGui::SameLine();
+	ImGui::SliderFloat("Amount##Hue Shift", &hueShift, 0, 1);
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
 	            ImGui::GetIO().Framerate);
 	// ----------------------------------------------------------
@@ -511,7 +613,7 @@ int main(int argc, char* argv[])
 	bool stopRendering = false;
 	auto startTime = std::chrono::system_clock::now();
 
-	while(!stopRendering)
+	while (!stopRendering)
 	{
 		//update currentTime
 		std::chrono::duration<float> timeSinceStart = std::chrono::system_clock::now() - startTime;
@@ -528,7 +630,7 @@ int main(int argc, char* argv[])
 		display();
 
 		// Render overlay GUI.
-		if(showUI)
+		if (showUI)
 		{
 			gui();
 		}
