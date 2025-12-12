@@ -9,15 +9,15 @@ using namespace glm;
 
 namespace pathtracer
 {
-///////////////////////////////////////////////////////////////////////////////
-// Get a random float. Note that we need one "generator" per thread, or we
-// would need to lock everytime someone called randf().
-///////////////////////////////////////////////////////////////////////////////
-std::mt19937 generators[24]; // Assuming no more than 24 cores
-float randf()
-{
-	return float(generators[omp_get_thread_num()]() / double(generators[omp_get_thread_num()].max()));
-}
+	///////////////////////////////////////////////////////////////////////////////
+	// Get a random float. Note that we need one "generator" per thread, or we
+	// would need to lock everytime someone called randf().
+	///////////////////////////////////////////////////////////////////////////////
+	std::mt19937 generators[32]; // Assuming no more than 24 cores -- Yes, I have more than 24 cores/threads... :)
+	float randf()
+	{
+		return float(generators[omp_get_thread_num()]() / double(generators[omp_get_thread_num()].max()));
+	}
 
 ///////////////////////////////////////////////////////////////////////////
 // Generate uniform points on a disc

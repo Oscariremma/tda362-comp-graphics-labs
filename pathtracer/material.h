@@ -157,7 +157,7 @@ public:
 	virtual WiSample sample_wi(const vec3& wo, const vec3& n) const override;
 };
 
-#if SOLUTION_PROJECT == PROJECT_REFRACTIONS
+
 ///////////////////////////////////////////////////////////////////////////
 // A perfect specular refraction.
 ///////////////////////////////////////////////////////////////////////////
@@ -189,7 +189,7 @@ public:
 
 	virtual WiSample sample_wi(const vec3& wo, const vec3& n) const override;
 };
-#endif
+
 
 
 } // namespace pathtracer

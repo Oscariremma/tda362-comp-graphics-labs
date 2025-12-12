@@ -30,7 +30,7 @@ static float deltaTime = 0.0f;
 bool showUI = true;
 
 // Mouse input
-ivec2 g_prevMouseCoords = { -1, -1 };
+ivec2 g_prevMouseCoords = {-1, -1};
 bool g_isMouseDragging = false;
 
 bool showLightSources = false;
@@ -64,6 +64,7 @@ struct scene_t
 		labhelper::Model* model;
 		mat4 modelMat;
 	};
+
 	std::vector<scene_object_t> models;
 
 	camera_t camera;
@@ -80,38 +81,46 @@ int selected_material_index = 0;
 
 void loadScenes()
 {
-	scenes["Sphere"] = { {
-		                     // Models
-		                     { labhelper::loadModelFromOBJ("../scenes/sphere.obj"), mat4(1.f) },
-		                 },
-		                 {
-		                     // Camera
-		                     vec3(-15, 0, 15),
-		                     normalize(-vec3(-15, 0, 15)),
-		                 } };
-	scenes["Ship"] = { {
-		                   // Models
-		                   { labhelper::loadModelFromOBJ("../scenes/space-ship.obj"),
-		                     translate(vec3(0.f, 8.f, 0.f)) },
-		                   { labhelper::loadModelFromOBJ("../scenes/landingpad.obj"), mat4(1.f) },
-		               },
-		               {
-		                   // Camera
-		                   vec3(-30, 15, 30),
-		                   normalize(-vec3(-30, 8, 30)),
-		               } };
+	scenes["Sphere"] = {
+		{
+			// Models
+			{labhelper::loadModelFromOBJ("../scenes/sphere.obj"), mat4(1.f)},
+		},
+		{
+			// Camera
+			vec3(-15, 0, 15),
+			normalize(-vec3(-15, 0, 15)),
+		}
+	};
+	scenes["Ship"] = {
+		{
+			// Models
+			{
+				labhelper::loadModelFromOBJ("../scenes/space-ship.obj"),
+				translate(vec3(0.f, 8.f, 0.f))
+			},
+			{labhelper::loadModelFromOBJ("../scenes/landingpad.obj"), mat4(1.f)},
+		},
+		{
+			// Camera
+			vec3(-30, 15, 30),
+			normalize(-vec3(-30, 8, 30)),
+		}
+	};
 	// Modify the landingpad screen's color
 	scenes["Ship"].models[1].model->m_materials[8].m_color = glm::vec3(0.380392, 0.588235, 0.266667);
 
-	scenes["Refractions"] = { {
-		                          // Models
-		                          { labhelper::loadModelFromOBJ("../scenes/refractions.obj"), mat4(1.f) },
-		                      },
-		                      {
-		                          // Camera
-		                          vec3(7.3, 3.2, 7.2),
-		                          normalize(vec3(-0.43, -0.27, -0.85)),
-		                      } };
+	scenes["Refractions"] = {
+		{
+			// Models
+			{labhelper::loadModelFromOBJ("../scenes/refractions.obj"), mat4(1.f)},
+		},
+		{
+			// Camera
+			vec3(7.3, 3.2, 7.2),
+			normalize(vec3(-0.43, -0.27, -0.85)),
+		}
+	};
 }
 
 void changeScene(std::string sceneName)
@@ -127,7 +136,7 @@ void changeScene(std::string sceneName)
 	pathtracer::reinitScene();
 
 	// Add models to pathtracer scene
-	for(auto& o : scenes[currentScene].models)
+	for (auto& o : scenes[currentScene].models)
 	{
 		pathtracer::addModel(o.model, o.modelMat);
 	}
@@ -138,9 +147,9 @@ void changeScene(std::string sceneName)
 
 void cleanupScenes()
 {
-	for(auto& it : scenes)
+	for (auto& it : scenes)
 	{
-		for(auto m : it.second.models)
+		for (auto m : it.second.models)
 		{
 			labhelper::freeModel(m.model);
 		}
@@ -220,9 +229,9 @@ void initialize()
 	// Load .obj models to scene
 	///////////////////////////////////////////////////////////////////////////
 	loadScenes();
-	changeScene("Ship");
+	//changeScene("Ship");
 	//changeScene("Sphere");
-	//changeScene("Refractions");
+	changeScene("Refractions");
 
 
 	///////////////////////////////////////////////////////////////////////////
@@ -234,14 +243,15 @@ void initialize()
 
 void display(void)
 {
-	{ ///////////////////////////////////////////////////////////////////////
+	{
+		///////////////////////////////////////////////////////////////////////
 		// If first frame, or window resized, or subsampling changes,
 		// inform the pathtracer
 		///////////////////////////////////////////////////////////////////////
 		int w, h;
 		SDL_GetWindowSize(g_window, &w, &h);
 		static int old_subsampling;
-		if(windowWidth != w || windowHeight != h || old_subsampling != pathtracer::settings.subsampling)
+		if (windowWidth != w || windowHeight != h || old_subsampling != pathtracer::settings.subsampling)
 		{
 			pathtracer::resize(w, h);
 			windowWidth = w;
@@ -256,7 +266,7 @@ void display(void)
 	mat4 viewMatrix = lookAt(camera.position, camera.position + camera.direction, worldUp);
 	mat4 projMatrix = perspective(radians(45.0f),
 	                              float(pathtracer::rendered_image.width)
-	                                  / float(pathtracer::rendered_image.height),
+	                              / float(pathtracer::rendered_image.height),
 	                              0.1f, 100.0f);
 	pathtracer::tracePaths(viewMatrix, projMatrix);
 
@@ -280,7 +290,7 @@ void display(void)
 	glUseProgram(shaderProgram);
 	labhelper::drawFullScreenQuad();
 
-	if(showLightSources)
+	if (showLightSources)
 	{
 		glUseProgram(simpleShaderProgram);
 
@@ -292,12 +302,12 @@ void display(void)
 
 		labhelper::debugDrawSphere();
 
-		for(int i = 0; i < pathtracer::disc_lights.size(); ++i)
+		for (int i = 0; i < pathtracer::disc_lights.size(); ++i)
 		{
 			mat3 tbn = labhelper::tangentSpace(pathtracer::disc_lights[i].direction);
 			tbn = mat3(tbn[0], tbn[2], tbn[1]);
 			mat4 modelMatrix = glm::translate(pathtracer::disc_lights[i].position) * mat4(tbn)
-			                   * glm::scale(vec3(pathtracer::disc_lights[i].radius));
+				* glm::scale(vec3(pathtracer::disc_lights[i].radius));
 			glUseProgram(simpleShaderProgram);
 			labhelper::setUniformSlow(simpleShaderProgram, "modelViewProjectionMatrix",
 			                          projMatrix * viewMatrix * modelMatrix);
@@ -307,7 +317,7 @@ void display(void)
 
 			labhelper::debugDrawArrow(viewMatrix, projMatrix, pathtracer::disc_lights[i].position,
 			                          pathtracer::disc_lights[i].position
-			                              + 2.f * pathtracer::disc_lights[i].direction);
+			                          + 2.f * pathtracer::disc_lights[i].direction);
 		}
 	}
 }
@@ -321,24 +331,24 @@ bool handleEvents(void)
 	// Allow ImGui to capture events.
 	ImGuiIO& io = ImGui::GetIO();
 
-	while(SDL_PollEvent(&event))
+	while (SDL_PollEvent(&event))
 	{
 		ImGui_ImplSdlGL3_ProcessEvent(&event);
 
-		if(event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
+		if (event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
 		{
 			quitEvent = true;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
 		{
 			showUI = !showUI;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
 		{
 			labhelper::saveScreenshot();
 		}
-		else if(event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT
-		        && !io.WantCaptureMouse)
+		else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT
+			&& !io.WantCaptureMouse)
 		{
 			g_isMouseDragging = true;
 			int x;
@@ -348,12 +358,12 @@ bool handleEvents(void)
 			g_prevMouseCoords.y = y;
 		}
 
-		if(!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
+		if (!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
 		{
 			g_isMouseDragging = false;
 		}
 
-		if(event.type == SDL_MOUSEMOTION && g_isMouseDragging)
+		if (event.type == SDL_MOUSEMOTION && g_isMouseDragging)
 		{
 			// More info at https://wiki.libsdl.org/SDL_MouseMotionEvent
 			int delta_x = event.motion.x - g_prevMouseCoords.x;
@@ -369,38 +379,38 @@ bool handleEvents(void)
 		}
 	}
 
-	if(!io.WantCaptureKeyboard)
+	if (!io.WantCaptureKeyboard)
 	{
 		// check keyboard state (which keys are still pressed)
 		const uint8_t* state = SDL_GetKeyboardState(nullptr);
 		vec3 cameraRight = cross(camera.direction, worldUp);
 		const float speed = 10.f;
-		if(state[SDL_SCANCODE_W])
+		if (state[SDL_SCANCODE_W])
 		{
 			camera.position += deltaTime * speed * camera.direction;
 			pathtracer::restart();
 		}
-		if(state[SDL_SCANCODE_S])
+		if (state[SDL_SCANCODE_S])
 		{
 			camera.position -= deltaTime * speed * camera.direction;
 			pathtracer::restart();
 		}
-		if(state[SDL_SCANCODE_A])
+		if (state[SDL_SCANCODE_A])
 		{
 			camera.position -= deltaTime * speed * cameraRight;
 			pathtracer::restart();
 		}
-		if(state[SDL_SCANCODE_D])
+		if (state[SDL_SCANCODE_D])
 		{
 			camera.position += deltaTime * speed * cameraRight;
 			pathtracer::restart();
 		}
-		if(state[SDL_SCANCODE_Q])
+		if (state[SDL_SCANCODE_Q])
 		{
 			camera.position -= deltaTime * speed * worldUp;
 			pathtracer::restart();
 		}
-		if(state[SDL_SCANCODE_E])
+		if (state[SDL_SCANCODE_E])
 		{
 			camera.position += deltaTime * speed * worldUp;
 			pathtracer::restart();
@@ -412,13 +422,13 @@ bool handleEvents(void)
 
 void gui()
 {
-	if(ImGui::BeginMainMenuBar())
+	if (ImGui::BeginMainMenuBar())
 	{
-		if(ImGui::BeginMenu("Scene"))
+		if (ImGui::BeginMenu("Scene"))
 		{
-			for(auto it : scenes)
+			for (auto it : scenes)
 			{
-				if(ImGui::MenuItem(it.first.c_str(), nullptr, it.first == currentScene))
+				if (ImGui::MenuItem(it.first.c_str(), nullptr, it.first == currentScene))
 				{
 					changeScene(it.first);
 				}
@@ -434,7 +444,7 @@ void gui()
 	static auto model_getter = [](void* scene, int idx, const char** text)
 	{
 		auto& s = *(static_cast<scene_t*>(scene));
-		if(idx < 0 || idx >= static_cast<int>(s.models.size()))
+		if (idx < 0 || idx >= static_cast<int>(s.models.size()))
 		{
 			return false;
 		}
@@ -446,7 +456,7 @@ void gui()
 	static auto mesh_getter = [](void* vec, int idx, const char** text)
 	{
 		auto& vector = *static_cast<std::vector<labhelper::Mesh>*>(vec);
-		if(idx < 0 || idx >= static_cast<int>(vector.size()))
+		if (idx < 0 || idx >= static_cast<int>(vector.size()))
 		{
 			return false;
 		}
@@ -457,7 +467,7 @@ void gui()
 	static auto material_getter = [](void* vec, int idx, const char** text)
 	{
 		auto& vector = *static_cast<std::vector<labhelper::Material>*>(vec);
-		if(idx < 0 || idx >= static_cast<int>(vector.size()))
+		if (idx < 0 || idx >= static_cast<int>(vector.size()))
 		{
 			return false;
 		}
@@ -465,22 +475,36 @@ void gui()
 		return true;
 	};
 
-	ImGui::SetNextWindowSizeConstraints({ 0, 0 }, { -1, float(windowHeight) - 20 });
+	ImGui::SetNextWindowSizeConstraints({0, 0}, {-1, float(windowHeight) - 20});
 	ImGui::Begin("Control Panel", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
 	///////////////////////////////////////////////////////////////////////////
 	// Pathtracer settings
 	///////////////////////////////////////////////////////////////////////////
-	if(ImGui::CollapsingHeader("Pathtracer", "pathtracer_ch", true, true))
+	if (ImGui::CollapsingHeader("Pathtracer", "pathtracer_ch", true, true))
 	{
 		ImGui::SliderInt("Subsampling", &pathtracer::settings.subsampling, 1, 16);
 		ImGui::SliderInt("Max Bounces", &pathtracer::settings.max_bounces, 0, 16);
 		ImGui::SliderInt("Max Paths Per Pixel", &pathtracer::settings.max_paths_per_pixel, 0, 1024);
-		if(ImGui::Button("Restart Pathtracing"))
+		if (ImGui::Button("Restart Pathtracing"))
 		{
 			pathtracer::restart();
 		}
 		ImGui::Text("Num. samples: %d", pathtracer::getSampleCount());
+		static float avgDeltaTime = 0.0f;
+		if (deltaTime > 0.0f)
+		{
+			avgDeltaTime = 0.95f * avgDeltaTime + 0.05f * deltaTime;
+			float samplesPerSecond = 1.0f / avgDeltaTime;
+			if (samplesPerSecond < 1.0f)
+			{
+				ImGui::Text("Seconds per sample: %.3f", avgDeltaTime);
+			}
+			else
+			{
+				ImGui::Text("Samples per second: %.1f", samplesPerSecond);
+			}
+		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////
@@ -489,10 +513,10 @@ void gui()
 	labhelper::Model* selected_model = scenes[currentScene].models[selected_model_index].model;
 	scene_t* selected_scene = &scenes[currentScene];
 
-	if(ImGui::CollapsingHeader("Models", "meshes_ch", true, true))
+	if (ImGui::CollapsingHeader("Models", "meshes_ch", true, true))
 	{
-		if(ImGui::Combo("Model", &selected_model_index, model_getter, (void*)selected_scene,
-		                int(selected_scene->models.size())))
+		if (ImGui::Combo("Model", &selected_model_index, model_getter, (void*)selected_scene,
+		                 int(selected_scene->models.size())))
 		{
 			selected_model = selected_scene->models[selected_model_index].model;
 			selected_mesh_index = 0;
@@ -503,10 +527,10 @@ void gui()
 		// List all meshes in the model and show properties for the selected
 		///////////////////////////////////////////////////////////////////////////
 
-		if(ImGui::CollapsingHeader("Meshes", "meshes_ch", true, true))
+		if (ImGui::CollapsingHeader("Meshes", "meshes_ch", true, true))
 		{
-			if(ImGui::ListBox("Meshes", &selected_mesh_index, mesh_getter, (void*)&selected_model->m_meshes,
-			                  int(selected_model->m_meshes.size()), 5))
+			if (ImGui::ListBox("Meshes", &selected_mesh_index, mesh_getter, (void*)&selected_model->m_meshes,
+			                   int(selected_model->m_meshes.size()), 5))
 			{
 				selected_material_index = selected_model->m_meshes[selected_mesh_index].m_material_idx;
 			}
@@ -518,7 +542,7 @@ void gui()
 		///////////////////////////////////////////////////////////////////////////
 		// List all materials in the model and show properties for the selected
 		///////////////////////////////////////////////////////////////////////////
-		if(ImGui::CollapsingHeader("Material", "materials_ch", true, true))
+		if (ImGui::CollapsingHeader("Material", "materials_ch", true, true))
 		{
 			labhelper::Material& material = selected_model->m_materials[selected_material_index];
 			ImGui::LabelText("Material Name", "%s", material.m_name.c_str());
@@ -532,11 +556,11 @@ void gui()
 		}
 
 #if ALLOW_SAVE_MATERIALS
-		if(ImGui::Button("Save Materials"))
+		if (ImGui::Button("Save Materials"))
 		{
 			labhelper::saveModelMaterialsToMTL(selected_model,
 			                                   labhelper::file::change_extension(selected_model->m_filename,
-			                                                                     ".mtl"));
+				                                   ".mtl"));
 		}
 #endif
 	}
@@ -544,7 +568,7 @@ void gui()
 	///////////////////////////////////////////////////////////////////////////
 	// Light and environment map
 	///////////////////////////////////////////////////////////////////////////
-	if(ImGui::CollapsingHeader("Light sources", "lights_ch", true, true))
+	if (ImGui::CollapsingHeader("Light sources", "lights_ch", true, true))
 	{
 		ImGui::Checkbox("Show Light Overlays", &showLightSources);
 		ImGui::SliderFloat("Environment multiplier", &pathtracer::environment.multiplier, 0.0f, 10.0f);
@@ -555,7 +579,7 @@ void gui()
 		                   0.0f, 10000.0f);
 		ImGui::DragFloat3("Position", &pathtracer::point_light.position.x, 0.1);
 
-		for(int i = 0; i < pathtracer::disc_lights.size(); ++i)
+		for (int i = 0; i < pathtracer::disc_lights.size(); ++i)
 		{
 			ImGui::PushID(i);
 			ImGui::Separator();
@@ -589,7 +613,7 @@ int main(int argc, char* argv[])
 	bool stopRendering = false;
 	auto startTime = std::chrono::system_clock::now();
 
-	while(!stopRendering)
+	while (!stopRendering)
 	{
 		//update currentTime
 		std::chrono::duration<float> timeSinceStart = std::chrono::system_clock::now() - startTime;
@@ -606,7 +630,7 @@ int main(int argc, char* argv[])
 		display();
 
 		// Then render overlay GUI.
-		if(showUI)
+		if (showUI)
 		{
 			gui();
 		}

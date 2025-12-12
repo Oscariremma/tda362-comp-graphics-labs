@@ -57,7 +57,9 @@
           ];
 
           # Set environment variables for CMake to find libraries
-          CMAKE_PREFIX_PATH = "${pkgs.SDL2}:${pkgs.glew}:${pkgs.glm}:${pkgs.embree2}";
+          CMAKE_PREFIX_PATH = "${pkgs.SDL2}:${pkgs.glew}:${pkgs.glm}";
+
+          EMBREE_INSTALL_DIR = "${pkgs.embree2}";
 
           # Ensure OpenGL libraries are found
           LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
