@@ -31,7 +31,7 @@ static float deltaTime = 0.0f;
 bool showUI = true;
 
 // Mouse input
-ivec2 g_prevMouseCoords = { -1, -1 };
+ivec2 g_prevMouseCoords = {-1, -1};
 bool g_isMouseDragging = false;
 bool g_isMouseRightDragging = false;
 
@@ -39,7 +39,7 @@ bool g_isMouseRightDragging = false;
 // Shader programs
 ///////////////////////////////////////////////////////////////////////////////
 GLuint shaderProgram; // Shader for rendering the final image
-GLuint depthProgram;  // Shader used to draw the shadow map
+GLuint depthProgram; // Shader used to draw the shadow map
 GLuint simpleShaderProgram;
 GLuint backgroundProgram;
 
@@ -78,11 +78,11 @@ FboInfo shadowMapFB;
 int shadowMapResolution = 1024;
 int shadowMapClampMode = ClampMode::Edge;
 bool shadowMapClampBorderShadowed = false;
-bool usePolygonOffset = false;
+bool usePolygonOffset = true;
 bool useSoftFalloff = false;
 bool useHardwarePCF = false;
-float polygonOffset_factor = .25f;
-float polygonOffset_units = 1.0f;
+float polygonOffset_factor = 2.0f;
+float polygonOffset_units = 20.0f;
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -110,6 +110,7 @@ struct scene_t
 		labhelper::Model* model;
 		mat4 modelMat;
 	};
+
 	std::vector<scene_object_t> models;
 
 	camera_t camera;
@@ -127,9 +128,9 @@ void changeScene(std::string sceneName)
 
 void cleanupScenes()
 {
-	for(auto& it : scenes)
+	for (auto& it : scenes)
 	{
-		for(auto& m : it.second.models)
+		for (auto& m : it.second.models)
 		{
 			labhelper::freeModel(m.model);
 		}
@@ -138,26 +139,34 @@ void cleanupScenes()
 
 void loadScenes()
 {
-	scenes["Ship"] = { {
-		                   // Models
-		                   { labhelper::loadModelFromOBJ("../scenes/space-ship.obj"),
-		                     translate(8.0f * worldUp) },
-		               },
-		               {
-		                   // Camera
-		                   vec3(-70, 50, 70),
-		                   normalize(-vec3(-70, 50, 70)),
-		               } };
-	scenes["Peter Panning"] = { {
-		                            // Models
-		                            { labhelper::loadModelFromOBJ("../scenes/peter-panning-plane.obj"),
-		                              mat4(1) },
-		                        },
-		                        {
-		                            // Camera
-		                            vec3(-13, 10, 17),
-		                            normalize(-vec3(-10, 7, 10)),
-		                        } };
+	scenes["Ship"] = {
+		{
+			// Models
+			{
+				labhelper::loadModelFromOBJ("../scenes/space-ship.obj"),
+				translate(8.0f * worldUp)
+			},
+		},
+		{
+			// Camera
+			vec3(-70, 50, 70),
+			normalize(-vec3(-70, 50, 70)),
+		}
+	};
+	scenes["Peter Panning"] = {
+		{
+			// Models
+			{
+				labhelper::loadModelFromOBJ("../scenes/peter-panning-plane.obj"),
+				mat4(1)
+			},
+		},
+		{
+			// Camera
+			vec3(-13, 10, 17),
+			normalize(-vec3(-10, 7, 10)),
+		}
+	};
 }
 
 
@@ -171,7 +180,7 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////
 	// Sanity Check
 	static int _initialized = 0;
-	if(_initialized++)
+	if (_initialized++)
 	{
 		labhelper::fatal_error("You must not call the initialize() function more than once!",
 		                       "Already initialized!");
@@ -207,7 +216,7 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////
 	const int roughnesses = 8;
 	std::vector<std::string> filenames;
-	for(int i = 0; i < roughnesses; i++)
+	for (int i = 0; i < roughnesses; i++)
 		filenames.push_back("../scenes/envmaps/" + envmap_base_name + "_dl_" + std::to_string(i) + ".hdr");
 
 	reflectionMap = labhelper::loadHdrMipmapTexture(filenames);
@@ -228,9 +237,12 @@ void initialize()
 	///////////////////////////////////////////////////////////////////////
 	shadowMapFB.resize(shadowMapResolution, shadowMapResolution);
 
+	glBindTexture(GL_TEXTURE_2D, shadowMapFB.depthBuffer);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
 
 	glEnable(GL_DEPTH_TEST); // enable Z-buffering
-	glEnable(GL_CULL_FACE);  // enables backface culling
+	glEnable(GL_CULL_FACE); // enables backface culling
 }
 
 void debugDrawLight(const glm::mat4& viewMatrix,
@@ -277,7 +289,6 @@ void drawScene(GLuint currentShaderProgram,
 	labhelper::setUniformSlow(currentShaderProgram, "spotOuterAngle", std::cos(radians(outerSpotlightAngle)));
 
 
-
 	// Environment
 	labhelper::setUniformSlow(currentShaderProgram, "environment_multiplier", environment_multiplier);
 
@@ -292,10 +303,21 @@ void drawScene(GLuint currentShaderProgram,
 	labhelper::setUniformSlow(currentShaderProgram, "normalMatrix",
 	                          inverse(transpose(viewMatrix * modelMatrix)));
 
+	labhelper::setUniformSlow(currentShaderProgram, "useSpotLight", useSpotLight ? 1 : 0);
+	labhelper::setUniformSlow(currentShaderProgram, "useSoftFalloff", useSoftFalloff ? 1 : 0);
+	labhelper::setUniformSlow(currentShaderProgram, "spotInnerAngle", std::cos(radians(innerSpotlightAngle)));
+
+	glActiveTexture(GL_TEXTURE10);
+	glBindTexture(GL_TEXTURE_2D, shadowMapFB.depthBuffer);
+
+	mat4 lightMatrix = translate(vec3(0.5f)) * scale(vec3(0.5f)) * lightProjectionMatrix * lightViewMatrix
+		* inverse(viewMatrix);
+	labhelper::setUniformSlow(currentShaderProgram, "lightMatrix", lightMatrix);
+
 	labhelper::render(landingpadModel);
 
 	// scene objects
-	for(auto& m : scenes[currentScene].models)
+	for (auto& m : scenes[currentScene].models)
 	{
 		labhelper::setUniformSlow(currentShaderProgram, "modelViewProjectionMatrix",
 		                          projectionMatrix * viewMatrix * m.modelMat);
@@ -342,10 +364,70 @@ void display(void)
 	// Set up shadow map parameters
 	///////////////////////////////////////////////////////////////////////////
 	// Task 1
+	if (shadowMapFB.width != shadowMapResolution || shadowMapFB.height != shadowMapResolution)
+	{
+		shadowMapFB.resize(shadowMapResolution, shadowMapResolution);
+	}
+
+	if (shadowMapClampMode == ClampMode::Edge)
+	{
+		glBindTexture(GL_TEXTURE_2D, shadowMapFB.depthBuffer);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	}
+
+	if (shadowMapClampMode == ClampMode::Border)
+	{
+		glBindTexture(GL_TEXTURE_2D, shadowMapFB.depthBuffer);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		vec4 border(shadowMapClampBorderShadowed ? 0.f : 1.f);
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, &border.x);
+	}
+
+	// This line is to avoid some warnings from OpenGL for having the shadowmap attached to texture unit 0
+	// when using a shader that samples from that texture with a sampler2D instead of a shadow sampler.
+	// It is never actually sampled, but just having it set there generates the warning in some systems.
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glActiveTexture(GL_TEXTURE10);
+	glBindTexture(GL_TEXTURE_2D, shadowMapFB.depthBuffer);
+
+	if (useHardwarePCF)
+	{
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+	else
+	{
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
+
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw Shadow Map
 	///////////////////////////////////////////////////////////////////////////
+
+	glBindFramebuffer(GL_FRAMEBUFFER, shadowMapFB.framebufferId);
+	glViewport(0, 0, shadowMapFB.width, shadowMapFB.height);
+	glClearColor(1.0, 1.0, 1.0, 1.0);
+	glClearDepth(1.0);
+	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+	if (usePolygonOffset)
+	{
+		glEnable(GL_POLYGON_OFFSET_FILL);
+		glPolygonOffset(polygonOffset_factor, polygonOffset_units);
+	}
+	drawScene(depthProgram, lightViewMatrix, lightProjMatrix, lightViewMatrix, lightProjMatrix);
+	if (usePolygonOffset)
+	{
+		glDisable(GL_POLYGON_OFFSET_FILL);
+	}
+
+	labhelper::Material& screen = landingpadModel->m_materials[8];
+	screen.m_emission_texture.gl_id = shadowMapFB.colorTextureTarget;
 
 	///////////////////////////////////////////////////////////////////////////
 	// Draw from camera
@@ -376,31 +458,31 @@ bool handleEvents(void)
 	// Allow ImGui to capture events.
 	ImGuiIO& io = ImGui::GetIO();
 
-	while(SDL_PollEvent(&event))
+	while (SDL_PollEvent(&event))
 	{
 		ImGui_ImplSdlGL3_ProcessEvent(&event);
 
-		if(event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
+		if (event.type == SDL_QUIT || (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_ESCAPE))
 		{
 			quitEvent = true;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_g)
 		{
 			showUI = !showUI;
 		}
-		else if(event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
+		else if (event.type == SDL_KEYUP && event.key.keysym.sym == SDLK_PRINTSCREEN)
 		{
 			labhelper::saveScreenshot();
 		}
-		else if(event.type == SDL_MOUSEBUTTONDOWN && (!showUI || !ImGui::GetIO().WantCaptureMouse)
-		        && (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT)
-		        && !(g_isMouseDragging || g_isMouseRightDragging))
+		else if (event.type == SDL_MOUSEBUTTONDOWN && (!showUI || !ImGui::GetIO().WantCaptureMouse)
+			&& (event.button.button == SDL_BUTTON_LEFT || event.button.button == SDL_BUTTON_RIGHT)
+			&& !(g_isMouseDragging || g_isMouseRightDragging))
 		{
-			if(event.button.button == SDL_BUTTON_LEFT)
+			if (event.button.button == SDL_BUTTON_LEFT)
 			{
 				g_isMouseDragging = true;
 			}
-			else if(event.button.button == SDL_BUTTON_RIGHT)
+			else if (event.button.button == SDL_BUTTON_RIGHT)
 			{
 				g_isMouseRightDragging = true;
 			}
@@ -411,28 +493,28 @@ bool handleEvents(void)
 			g_prevMouseCoords.y = y;
 		}
 
-		if(!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
+		if (!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_LEFT)))
 		{
 			g_isMouseDragging = false;
 		}
-		if(!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)))
+		if (!(SDL_GetMouseState(NULL, NULL) & SDL_BUTTON(SDL_BUTTON_RIGHT)))
 		{
 			g_isMouseRightDragging = false;
 		}
 
-		if(event.type == SDL_MOUSEMOTION)
+		if (event.type == SDL_MOUSEMOTION)
 		{
 			// More info at https://wiki.libsdl.org/SDL_MouseMotionEvent
 			int delta_x = event.motion.x - g_prevMouseCoords.x;
 			int delta_y = event.motion.y - g_prevMouseCoords.y;
-			if(g_isMouseDragging)
+			if (g_isMouseDragging)
 			{
 				float rotation_speed = 0.005f;
 				mat4 yaw = rotate(rotation_speed * -delta_x, worldUp);
 				mat4 pitch = rotate(rotation_speed * -delta_y, normalize(cross(camera.direction, worldUp)));
 				camera.direction = vec3(pitch * yaw * vec4(camera.direction, 0.0f));
 			}
-			else if(g_isMouseRightDragging)
+			else if (g_isMouseRightDragging)
 			{
 				const float rotation_speed = 0.01f;
 				lightAzimuth += delta_x * rotation_speed;
@@ -442,39 +524,39 @@ bool handleEvents(void)
 		}
 	}
 
-	if(!io.WantCaptureKeyboard)
+	if (!io.WantCaptureKeyboard)
 	{
 		// check keyboard state (which keys are still pressed)
 		const uint8_t* state = SDL_GetKeyboardState(nullptr);
 		vec3 cameraRight = cross(camera.direction, worldUp);
-		if(state[SDL_SCANCODE_W])
+		if (state[SDL_SCANCODE_W])
 		{
 			camera.position += deltaTime * cameraSpeed * camera.direction;
 		}
-		if(state[SDL_SCANCODE_S])
+		if (state[SDL_SCANCODE_S])
 		{
 			camera.position -= deltaTime * cameraSpeed * camera.direction;
 		}
-		if(state[SDL_SCANCODE_A])
+		if (state[SDL_SCANCODE_A])
 		{
 			camera.position -= deltaTime * cameraSpeed * cameraRight;
 		}
-		if(state[SDL_SCANCODE_D])
+		if (state[SDL_SCANCODE_D])
 		{
 			camera.position += deltaTime * cameraSpeed * cameraRight;
 		}
-		if(state[SDL_SCANCODE_Q])
+		if (state[SDL_SCANCODE_Q])
 		{
 			camera.position -= deltaTime * cameraSpeed * worldUp;
 		}
-		if(state[SDL_SCANCODE_E])
+		if (state[SDL_SCANCODE_E])
 		{
 			camera.position += deltaTime * cameraSpeed * worldUp;
 		}
 	}
 
 	const float light_rotation_speed = 90.f;
-	if(animateLight)
+	if (animateLight)
 	{
 		lightAzimuth += deltaTime * light_rotation_speed;
 		lightAzimuth = fmodf(lightAzimuth, 360.f);
@@ -489,13 +571,13 @@ bool handleEvents(void)
 ///////////////////////////////////////////////////////////////////////////////
 void gui()
 {
-	if(ImGui::BeginMainMenuBar())
+	if (ImGui::BeginMainMenuBar())
 	{
-		if(ImGui::BeginMenu("Scene"))
+		if (ImGui::BeginMenu("Scene"))
 		{
-			for(auto it : scenes)
+			for (auto it : scenes)
 			{
-				if(ImGui::MenuItem(it.first.c_str(), nullptr, it.first == currentScene))
+				if (ImGui::MenuItem(it.first.c_str(), nullptr, it.first == currentScene))
 				{
 					changeScene(it.first);
 				}
@@ -537,7 +619,7 @@ int main(int argc, char* argv[])
 	bool stopRendering = false;
 	auto startTime = std::chrono::system_clock::now();
 
-	while(!stopRendering)
+	while (!stopRendering)
 	{
 		//update currentTime
 		std::chrono::duration<float> timeSinceStart = std::chrono::system_clock::now() - startTime;
@@ -554,7 +636,7 @@ int main(int argc, char* argv[])
 		display();
 
 		// Render overlay GUI.
-		if(showUI)
+		if (showUI)
 		{
 			gui();
 		}
