@@ -53,20 +53,20 @@ vec3 MicrofacetBRDF::f(const vec3& wi, const vec3& wo, const vec3& n) const
 	if(cosThetaI <= 0.0f || cosThetaO <= 0.0f)
 		return vec3(0.0f);
 
-	vec3 wh = normalize(wi + wo);
-	float cosThetaH = max(0.0f, dot(N, wh));
-	float woDotWh = max(0.0f, dot(wo, wh));
-    
-    // D(wh)
-    float D = ((shininess + 2.0f) / (2.0f * M_PI)) * pow(cosThetaH, shininess);
+	const float epsilon = 0.001f;
 
-    // G(wi, wo)
-	float G = min(1.0f, min(2.0f * cosThetaH * cosThetaO / woDotWh,
-	                        2.0f * cosThetaH * cosThetaI / woDotWh));
-    
-    // BRDF
-    float brdf_val = (D * G) / (4.0f * cosThetaO * cosThetaI);
-	return vec3(brdf_val);
+	const vec3 wh = normalize(wi + wo);
+	const float NdotWh = max(epsilon, dot(n, wh));
+	const float NdotWi = max(epsilon, dot(n, wi));
+	const float NdotWo = max(epsilon, dot(n, wo));
+	const float WoDotWh = max(epsilon, dot(wo, wh));
+
+	const float D = (shininess + 2.0f) / (2.0f * M_PI) * pow(NdotWh, shininess);
+	const float G = min(1.0f,
+	                       min((2.0f * NdotWh * NdotWo) / WoDotWh,
+	                           (2.0f * NdotWh * NdotWi) / WoDotWh));
+
+	return vec3(D * G / (4.0f * NdotWi * NdotWo));
 }
 
 WiSample MicrofacetBRDF::sample_wi(const vec3& wo, const vec3& n) const
@@ -126,88 +126,37 @@ float BSDF::fresnel(const vec3& wi, const vec3& wo) const
 
 vec3 DielectricBSDF::f(const vec3& wi, const vec3& wo, const vec3& n) const
 {
-	float F;
-	if (dot(wo, n) < 0.0f)
-	{
-		// Internal reflection
-		// Recover IoR from R0
-		float sqrtR0 = sqrt(clamp(R0, 0.0f, 0.99f));
-		float ior = (1.0f + sqrtR0) / (1.0f - sqrtR0);
-		
-		float cosThetaI = dot(wo, -n);
-		float sin2ThetaI = 1.0f - cosThetaI * cosThetaI;
-		float sin2ThetaT = (ior * ior) * sin2ThetaI;
-		
-		if(sin2ThetaT > 1.0f)
-		{
-			// TIR
-			F = 1.0f;
-		}
-		else
-		{
-			float cosThetaT = sqrt(1.0f - sin2ThetaT);
-			F = R0 + (1.0f - R0) * pow(1.0f - cosThetaT, 5.0f);
-		}
-	}
-	else
-	{
-		// External reflection
-		F = fresnel(wi, wo);
-	}
-
-	return F * reflective_material->f(wi, wo, n) + (1.0f - F) * transmissive_material->f(wi, wo, n);
+	const float F = fresnel(wi, wo);
+	const vec3 reflective_part = reflective_material->f(wi, wo, n);
+	const vec3 transmissive_part = transmissive_material->f(wi, wo, n);
+	return F * reflective_part + (1.0f - F) * transmissive_part;
 }
 
 WiSample DielectricBSDF::sample_wi(const vec3& wo, const vec3& n) const
 {
 	WiSample r;
-	
-	float F;
-	if (dot(wo, n) < 0.0f)
-	{
-		// Internal reflection
-		// Recover IoR from R0
-		float sqrtR0 = sqrt(clamp(R0, 0.0f, 0.99f));
-		float ior = (1.0f + sqrtR0) / (1.0f - sqrtR0);
-		
-		float cosThetaI = dot(wo, -n);
-		float sin2ThetaI = 1.0f - cosThetaI * cosThetaI;
-		float sin2ThetaT = (ior * ior) * sin2ThetaI;
-		
-		if(sin2ThetaT > 1.0f)
-		{
-			// TIR
-			F = 1.0f;
-		}
-		else
-		{
-			float cosThetaT = sqrt(1.0f - sin2ThetaT);
-			F = R0 + (1.0f - R0) * pow(1.0f - cosThetaT, 5.0f);
-		}
-	}
-	else
-	{
-		// External reflection sampling
-		// Use ideal reflection vector to estimate F
-		vec3 wi_reflect = reflect(-wo, n);
-		F = fresnel(wi_reflect, wo);
-	}
+	vec3 N = n;
+	if(dot(wo, N) < 0.0f)
+		N = -N;
 
-	if(randf() < F)
+	if(randf() < 0.5)
 	{
-		// Sample BRDF (Reflection)
 		r = reflective_material->sample_wi(wo, n);
-		r.pdf *= F;
+		r.pdf *= 0.5f;
+		float F = fresnel(r.wi, wo);
 		r.f *= F;
 	}
 	else
 	{
-		// Sample BTDF (Traismission/Diffuse)
 		r = transmissive_material->sample_wi(wo, n);
-		r.pdf *= (1.0f - F);
-		r.f *= (1.0f - F);
+		r.pdf *= 0.5f;
+		// Use macro-surface Fresnel approximation for transmission weighting
+		// since we don't have a valid reflection vector for this lobe in the helper
+		vec3 wi_reflect = reflect(-wo, N);
+		float F = fresnel(wi_reflect, wo);
+		r.f *= (1 - F);
 	}
-	
+
 	return r;
 }
 
@@ -252,43 +201,11 @@ vec3 GlassBTDF::f(const vec3& wi, const vec3& wo, const vec3& n) const
 {
 	if(sameHemisphere(wi, wo, n))
 	{
-		return vec3(0.0f);
+		return vec3(0);
 	}
 	else
 	{
-		// Calculate ideal refraction vector wt
-		float eta;
-		vec3 N;
-		if(dot(wo, n) > 0.0f)
-		{
-			N = n;
-			eta = 1.0f / ior;
-		}
-		else
-		{
-			N = -n;
-			eta = ior;
-		}
-
-		float w = dot(wo, N) * eta;
-		float k = 1.0f + (w - eta) * (w + eta);
-		
-		if(k < 0.0f)
-		{
-			// TIR: No transmission
-			return vec3(0.0f);
-		}
-		
-		k = sqrt(k);
-		vec3 wt = normalize(-eta * wo + (w - k) * N);
-		
-		// Evaluate Blinn-Phong-like lobe centered at wt
-		// Using a high exponent to simulate sharp refraction of the point light
-		float cosAlpha = max(0.0f, dot(wi, wt));
-		float shininess = 10000.0f; // Very sharp to mimicking delta
-		float normalization = (shininess + 2.0f) / (2.0f * M_PI);
-		
-		return vec3(1.0f) * normalization * pow(cosAlpha, shininess);
+		return vec3(1);
 	}
 }
 
@@ -309,16 +226,7 @@ WiSample GlassBTDF::sample_wi(const vec3& wo, const vec3& n) const
 		eta = ior;
 	}
 
-	// Alternatively:
-	// d = dot(wo, N)
-	// k = d * d (1 - eta*eta)
-	// wi = normalize(-eta * wo + (d * eta - sqrt(k)) * N)
 
-	// or
-
-	// d = dot(n, wo)
-	// k = 1 - eta*eta * (1 - d * d)
-	// wi = - eta * wo + ( eta * d - sqrt(k) ) * N
 
 	float w = dot(wo, N) * eta;
 	float k = 1.0f + (w - eta) * (w + eta);
