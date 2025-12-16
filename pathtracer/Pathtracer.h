@@ -9,7 +9,7 @@
 #undef M_PI
 #endif
 #define M_PI 3.14159265359f
-#define EPSILON 0.0001f
+#define EPSILON 0.001f
 
 
 using namespace glm;

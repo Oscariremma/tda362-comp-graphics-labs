@@ -89,7 +89,12 @@ vec3 Li(Ray& primary_ray)
 		GlassBTDF glass(hit.material->m_ior);
 		BTDFLinearBlend transparency_blend(hit.material->m_transparency, &glass, &diffuse);
 		MicrofacetBRDF microfacet(hit.material->m_shininess);
-		DielectricBSDF dielectric(&microfacet, &transparency_blend, hit.material->m_fresnel);
+		
+		// Calculate R0 from IoR for dielectric interface (air-dielectric)
+		// R0 = ((n-1)/(n+1))^2
+		float R0 = pow((hit.material->m_ior - 1.0f) / (hit.material->m_ior + 1.0f), 2.0f);
+		DielectricBSDF dielectric(&microfacet, &transparency_blend, R0);
+		
 		MetalBSDF metal(&microfacet, hit.material->m_color, hit.material->m_fresnel);
 		BSDFLinearBlend metal_blend(hit.material->m_metalness, &metal, &dielectric);
 		BSDF& mat = metal_blend;
@@ -105,9 +110,53 @@ vec3 Li(Ray& primary_ray)
 
 			Ray shadow_ray(hit.position + hit.geometry_normal * EPSILON, wi);
 			shadow_ray.tfar = distance_to_light;
-			if(!occluded(shadow_ray))
+			
+			// If shadow ray hits something, we need to check if it's transparent
+			// Iterate through transparent surfaces
+			vec3 shadow_throughput(1.0f);
+			bool visible = true;
+			
+			// Limit shadow transparency depth
+			for(int shadow_bounces = 0; shadow_bounces < 10; ++shadow_bounces)
 			{
-				L += path_throughput * mat.f(wi, hit.wo, hit.shading_normal) * Li * std::max(0.0f, dot(wi, hit.shading_normal));
+				if(!intersect(shadow_ray))
+				{
+					// Reached light (or at least no occluder within distance)
+					break; 
+				}
+
+				Intersection shadow_hit = getIntersection(shadow_ray);
+				
+				// Check if occluder is beyond light source?
+				// intersect() respects tfar, so we don't need manual distance check strictly if set correctly.
+				// However, intersect updates tfar to hit distance.
+				
+				if(shadow_hit.material->m_transparency > 0.0f)
+				{
+					// Transparent object
+					shadow_throughput *= shadow_hit.material->m_color * shadow_hit.material->m_transparency;
+					
+					// Continue ray
+					// Bias slightly forward from hit
+					shadow_ray.o = shadow_hit.position + shadow_ray.d * EPSILON;
+					shadow_ray.tfar = distance_to_light - length(shadow_hit.position - hit.position); // Approximate remaining distance
+                    // Actually clearer to just reset tfar relative to new origin or just trust tfar logic if we track distance.
+                    // Let's just set tfar to a large value or remaining distance.
+                    float dist_so_far = length(shadow_hit.position - hit.position); 
+                    // Better: Point light is at known position.
+                    shadow_ray.tfar = length(point_light.position - shadow_ray.o);
+				}
+				else
+				{
+					// Opaque occluder
+					visible = false;
+					break;
+				}
+			}
+
+			if(visible)
+			{
+				L += path_throughput * mat.f(wi, hit.wo, hit.shading_normal) * Li * shadow_throughput * std::abs(dot(wi, hit.shading_normal));
 			}
 		}
 
